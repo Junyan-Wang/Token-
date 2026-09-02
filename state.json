@@ -1,4 +1,78 @@
 {
-  "first_run": true,
-  "prices": {}
+  "first_run": false,
+  "prices": {
+    "deepseek/deepseek-v4-pro-0813": {
+      "prompt": 1.1154,
+      "completion": 3.3461999999999996
+    },
+    "deepseek/deepseek-v4-flash-0731": {
+      "prompt": 0.065,
+      "completion": 0.18
+    },
+    "qwen/qwen3.8-max": {
+      "prompt": 2.0,
+      "completion": 6.0
+    },
+    "moonshotai/kimi-k3": {
+      "prompt": 3.0,
+      "completion": 15.0
+    },
+    "z-ai/glm-5.3": {
+      "prompt": 1.4,
+      "completion": 4.4
+    },
+    "tencent/hy4-preview": {
+      "prompt": 0.834,
+      "completion": 2.501
+    },
+    "bytedance-seed/seed-2-1-turbo": {
+      "prompt": 0.5,
+      "completion": 2.5
+    },
+    "meituan/longcat-2.0": {
+      "prompt": 0.3,
+      "completion": 1.2
+    },
+    "minimax/minimax-m3": {
+      "prompt": 0.3,
+      "completion": 1.2
+    },
+    "baidu/ernie-4.5-vl-424b-a47b": {
+      "prompt": 0.42,
+      "completion": 1.25
+    },
+    "xiaomi/mimo-v2.5-pro": {
+      "prompt": 0.435,
+      "completion": 0.87
+    },
+    "stepfun/step-3.7-flash": {
+      "prompt": 0.19999999999999998,
+      "completion": 1.15
+    },
+    "openai/gpt-5.5": {
+      "prompt": 5.0,
+      "completion": 30.0
+    },
+    "anthropic/claude-opus-5": {
+      "prompt": 5.0,
+      "completion": 25.0
+    },
+    "google/gemini-3.1-pro-preview": {
+      "prompt": 2.0,
+      "completion": 12.0
+    },
+    "x-ai/grok-4.6": {
+      "prompt": 2.0,
+      "completion": 6.0
+    },
+    "meta-llama/llama-4-maverick": {
+      "prompt": 0.19999999999999998,
+      "completion": 0.696
+    },
+    "amazon/nova-premier-v1": {
+      "prompt": 2.5,
+      "completion": 12.5
+    }
+  },
+  "last_run": "2026-09-02 02:31"
 }
