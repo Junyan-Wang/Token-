@@ -18,6 +18,7 @@ GPU 算力活动监控
 import json
 import os
 import sys
+import re
 import datetime
 import requests
 
@@ -96,26 +97,111 @@ def fetch_discourse(base, keywords):
 
 # ---------- 数据源 2：GitHub 仓库更新 ----------
 
+def extract_added_resources(patch):
+    """从 resources.json 的 diff patch 中提取「新增资源」条目。
+
+    只在新增行（+ 开头）里识别 `"name"` 字段，避免把巡检导致的
+    status / free_tier 等字段变化误判为新增资源。
+    返回：[{"name", "url", "description", "free_tier"}, ...]
+    """
+    if not patch:
+        return []
+    added = []
+    cur = None
+    for raw in patch.split("\n"):
+        if raw.startswith("+++") or raw.startswith("---"):
+            continue
+        if not raw.startswith("+"):
+            # 遇到非新增行，收尾上一个未闭合对象
+            if cur and cur.get("name"):
+                added.append(cur)
+            cur = None
+            continue
+        line = raw[1:].strip()
+        m = re.search(r'"name"\s*:\s*"([^"]+)"', line)
+        if m:
+            if cur and cur.get("name"):
+                added.append(cur)  # 上一个新增对象收尾
+            cur = {"name": m.group(1)}
+            continue
+        if cur is not None:
+            m = re.search(r'"url"\s*:\s*"([^"]+)"', line)
+            if m and "url" not in cur:
+                cur["url"] = m.group(1)
+            m = re.search(r'"free_tier"\s*:\s*"([^"]+)"', line)
+            if m and "free_tier" not in cur:
+                cur["free_tier"] = m.group(1)
+            m = re.search(r'"description"\s*:\s*"([^"]+)"', line)
+            if m and "description" not in cur:
+                cur["description"] = m.group(1)
+    if cur and cur.get("name"):
+        added.append(cur)
+    return added
+
+
+def _get_commit_detail(repo, sha, headers):
+    """拉取单个 commit 的文件级 diff"""
+    api = f"https://api.github.com/repos/{repo}/commits/{sha}"
+    try:
+        r = requests.get(api, headers=headers, timeout=HTTP_TIMEOUT)
+        r.raise_for_status()
+        return r.json()
+    except Exception as e:
+        print(f"[warn] 获取 commit {sha[:8]} 详情失败: {type(e).__name__}: {e}")
+        return None
+
+
+def _extract_added_from_commit(detail):
+    """从 commit 详情的 files 数组中，汇总 resources.json 里新增的资源"""
+    files = detail.get("files", []) or []
+    added = []
+    for f in files:
+        fn = f.get("filename", "")
+        if fn.endswith("resources.json"):
+            added += extract_added_resources(f.get("patch", ""))
+    return added
+
+
 def fetch_github_commits(repo, token=None):
-    """监控指定 GitHub 仓库的最新 commit，有新提交即提醒"""
-    api = f"https://api.github.com/repos/{repo}/commits?per_page=3"
+    """监控 GitHub 仓库的「新增免费资源」，而非所有 commit。
+
+    逐个拉取最新 commit 的文件级 diff，只在 data/resources.json 出现
+    新增资源条目（新增 `"name"` 字段）时才生成情报，并附带免费额度摘要。
+    例行巡检类 commit（只改 status.json / 无新增资源）会被跳过。
+    """
+    api = f"https://api.github.com/repos/{repo}/commits?per_page=5"
     headers = {"Accept": "application/vnd.github+json", "User-Agent": "gpu-deal-monitor"}
     if token:
         headers["Authorization"] = f"Bearer {token}"
     try:
         r = requests.get(api, headers=headers, timeout=HTTP_TIMEOUT)
         r.raise_for_status()
+        commits = r.json()
         items = []
-        for c in r.json():
-            msg = (c.get("commit", {}).get("message", "") or "").split("\n")[0][:60]
+        for c in commits:
+            sha = c.get("sha", "")
+            if not sha:
+                continue
+            detail = _get_commit_detail(repo, sha, headers)
+            if detail is None:
+                continue
+            added = _extract_added_from_commit(detail)
+            if not added:
+                # 无新增资源（纯巡检/维护），跳过，不推送
+                continue
+            names = [a.get("name", "?") for a in added]
+            title = f"新增免费资源: {'、'.join(names[:5])}"
+            if len(names) > 5:
+                title += f" 等 {len(names)} 个"
             items.append({
-                "id": f"github:{repo}:{c.get('sha', '')[:12]}",
+                "id": f"github:{repo}:{sha[:12]}",
                 "source": f"GitHub·{repo.split('/')[-1]}",
-                "title": f"仓库有更新: {msg}",
+                "title": title,
                 "url": c.get("html_url", ""),
                 "time": c.get("commit", {}).get("author", {}).get("date", ""),
+                "added": added,  # 附带详情，供推送摘要展开
             })
-        print(f"[ok] {repo} 最新 {len(items)} 个 commit")
+        print(f"[ok] {repo} 最近 {len(commits)} 个 commit，含新增资源 {len(items)} 个")
         return items
     except Exception as e:
         print(f"[warn] {repo} 抓取失败（跳过）: {type(e).__name__}: {e}")
@@ -234,14 +320,25 @@ def main():
 
     # 组装推送内容
     show = fresh[:MAX_PUSH_ITEMS]
-    lines = [f"### 🔍 发现 {len(fresh)} 条算力情报\n"]
+    lines = [f"### 🔍 发现 {len(fresh)} 条算力福利\n"]
     for i, it in enumerate(show, 1):
         lines.append(f"**{i}. {it['title']}**")
+        # GitHub 源附带新增资源详情，直接展开免费额度，一眼可判是否福利
+        for a in it.get("added", [])[:5]:
+            name = a.get("name", "?").strip()
+            ft = a.get("free_tier", "").strip()
+            url = a.get("url", "").strip()
+            if ft:
+                lines.append(f"- {name}：{ft}")
+            elif url:
+                lines.append(f"- {name}：{url}")
+            else:
+                lines.append(f"- {name}")
         lines.append(f"来源: {it['source']} → [点此查看]({it['url']})\n")
     if len(fresh) > MAX_PUSH_ITEMS:
         lines.append(f"> 还有 {len(fresh) - MAX_PUSH_ITEMS} 条未展开")
     desp = "\n".join(lines)
-    title = f"⚡算力情报: 新增 {len(fresh)} 条（{now}）"
+    title = f"⚡算力福利: 新增 {len(fresh)} 条（{now}）"
 
     print("\n----- 推送预览 -----")
     print(desp)
