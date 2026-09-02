@@ -1,5 +1,9 @@
 {
-  "keywords": ["白嫖", "羊毛", "算力", "免费领", "免费送", "免费 GPU", "免费GPU", "送 Token", "送算力", "额度", "代金券", "抵用券", "0元", "0 元", "credits", "free tier", "GPU"],
+  "keywords": [
+    "白嫖", "羊毛", "免费领", "免费送", "免费算力", "免费GPU", "免费 GPU",
+    "免费额度", "送算力", "送额度", "送 Token", "代金券", "抵用券", "0元", "0 元",
+    "credits", "free tier", "free gpu", "free credits"
+  ],
   "linuxdo_sites": [
     "https://linux.do"
   ],
@@ -7,6 +11,9 @@
     "caozuohua/free-resources"
   ],
   "rss_feeds": [
+    "https://hnrss.org/newest?q=free%20GPU%20OR%20free%20credits%20OR%20free%20tier",
+    "https://sspai.com/feed",
+    "https://www.ithome.com/rss/",
     "https://www.v2ex.com/index.xml",
     "https://linux.do/latest.rss"
   ]
