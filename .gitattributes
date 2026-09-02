@@ -1,0 +1,8 @@
+# 强制所有文本文件使用 LF 换行，避免在 Linux (GitHub Actions) 上运行 bash 脚本时因 CRLF 报错
+* text=auto eol=lf
+*.py text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
