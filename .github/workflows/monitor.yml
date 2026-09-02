@@ -1,0 +1,44 @@
+name: GPU 算力活动监控
+
+on:
+  schedule:
+    # UTC 时间，每 2 小时的第 23 分钟跑一次（约等于北京时间偶数小时 23 分）
+    # GitHub 定时任务有 5~30 分钟随机延迟，属正常现象
+    - cron: "23 */2 * * *"
+  workflow_dispatch: {}   # 允许在 Actions 页面手动点按钮触发
+
+permissions:
+  contents: write         # 允许把 state.json 写回仓库（去重用）
+
+concurrency:
+  group: monitor
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 拉取仓库代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 安装依赖
+        run: pip install -r requirements.txt
+
+      - name: 运行监控
+        env:
+          SERVERCHAN_SENDKEY: ${{ secrets.SERVERCHAN_SENDKEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python monitor.py
+
+      - name: 保存监控状态（去重记录）
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add state.json
+          git diff --cached --quiet || git commit -m "chore: update monitor state [skip ci]"
+          git push
