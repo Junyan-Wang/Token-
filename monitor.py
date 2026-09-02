@@ -53,17 +53,26 @@ def save_json(path, data):
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
-def match_keywords(text, keywords):
-    """关键词命中（大小写不敏感）"""
+def match_keywords(text, keywords, neg_keywords=None):
+    """关键词命中（大小写不敏感），且排除否定词。
+
+    正向命中：标题含任一福利关键词；
+    否定排除：标题含任一否定词（辟谣/翻车/停运等）则视为无效情报，
+    避免把"某平台免费额度被砍"这类负面消息当福利推送。
+    """
     if not text:
         return False
     low = text.lower()
-    return any(str(k).lower() in low for k in keywords)
+    if not any(str(k).lower() in low for k in keywords):
+        return False
+    if neg_keywords and any(str(k).lower() in low for k in neg_keywords):
+        return False
+    return True
 
 
 # ---------- 数据源 1：Discourse 论坛（linux.do） ----------
 
-def fetch_discourse(base, keywords):
+def fetch_discourse(base, keywords, neg_keywords=None):
     """抓 Discourse 站点最新帖，按标题关键词过滤"""
     url = base.rstrip("/") + "/latest.json"
     try:
@@ -77,7 +86,7 @@ def fetch_discourse(base, keywords):
         items = []
         for t in topics:
             title = t.get("title", "")
-            if not title or not match_keywords(title, keywords):
+            if not title or not match_keywords(title, keywords, neg_keywords):
                 continue
             tid = t.get("id")
             slug = t.get("slug") or "topic"
@@ -210,7 +219,7 @@ def fetch_github_commits(repo, token=None):
 
 # ---------- 数据源 3：RSS / Atom 订阅 ----------
 
-def fetch_rss(url, keywords):
+def fetch_rss(url, keywords, neg_keywords=None):
     """抓 RSS/Atom 源，按标题关键词过滤"""
     if feedparser is None:
         print("[warn] feedparser 未安装，跳过 RSS 源")
@@ -221,7 +230,7 @@ def fetch_rss(url, keywords):
         items = []
         for e in entries:
             title = e.get("title", "")
-            if not title or not match_keywords(title, keywords):
+            if not title or not match_keywords(title, keywords, neg_keywords):
                 continue
             link = e.get("link", "")
             # 生成稳定 id：优先用 guid/id，否则用链接哈希
@@ -264,6 +273,7 @@ def push_serverchan(sendkey, title, desp):
 def main():
     config = load_json(CONFIG_FILE, {})
     keywords = config.get("keywords", [])
+    neg_keywords = config.get("negative_keywords", [])
     state = load_json(STATE_FILE, {"seen": {}, "first_run": True})
     seen = state.get("seen", {})
 
@@ -272,11 +282,11 @@ def main():
 
     all_items = []
     for site in config.get("linuxdo_sites", []):
-        all_items += fetch_discourse(site, keywords)
+        all_items += fetch_discourse(site, keywords, neg_keywords)
     for repo in config.get("github_repos", []):
         all_items += fetch_github_commits(repo, gh_token)
     for feed in config.get("rss_feeds", []):
-        all_items += fetch_rss(feed, keywords)
+        all_items += fetch_rss(feed, keywords, neg_keywords)
 
     # 跨源去重：同一 URL 只保留一条（同一情报可能被多个源同时覆盖）
     dedup = {}
