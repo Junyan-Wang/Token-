@@ -265,6 +265,8 @@ def main():
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
     state["prices"] = new_prices
     state["last_run"] = now
+    state["model_count"] = len(new_prices)
+    state["cny_rate"] = rate
 
     if state.get("first_run", True):
         state["first_run"] = False
