@@ -1,39 +1,33 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-GPU 算力活动监控
-================
-抓取多个情报源（linux.do 最新帖 / GitHub 仓库更新 / RSS 订阅），
-按关键词过滤出「送算力、免费额度、白嫖羊毛」类情报，
-与 state.json 中已见过的条目对比，发现新增即通过 Server酱 推送到微信。
+Token 价格监测
+==============
+定时拉取 OpenRouter 公开接口（openrouter.ai/api/v1/models，免费无需 key），
+获取 400+ 大模型的实时价格，按 config.json 的 track_models 清单过滤出
+关注的国产/国际旗舰模型，与 state.json 中的价格快照对比，发现
+「价格变动 / 新模型上线 / 模型下架」即通过 Server酱 推送到微信。
 
 用法：
     python monitor.py
 
 环境变量（均可选）：
     SERVERCHAN_SENDKEY   Server酱的 SendKey，未配置时只打印日志不推送
-    GITHUB_TOKEN         GitHub API token，Actions 里自动注入，可提高限速额度
+    GITHUB_TOKEN         GitHub API token，Actions 里自动注入（本脚本未用，保留占位）
 """
 
 import json
 import os
-import sys
-import re
 import datetime
 import requests
-
-try:
-    import feedparser
-except ImportError:
-    feedparser = None
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_FILE = os.path.join(BASE_DIR, "config.json")
 STATE_FILE = os.path.join(BASE_DIR, "state.json")
 
-MAX_PUSH_ITEMS = 8        # 单次最多推送条数（防轰炸）
-STATE_KEEP = 800          # 状态文件最多保留的已见条目数
-HTTP_TIMEOUT = 25
+OPENROUTER_API = "https://openrouter.ai/api/v1/models"
+HTTP_TIMEOUT = 30
+MAX_PUSH_ITEMS = 20       # 单次最多推送的变动条数（防轰炸）
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36")
 
@@ -53,203 +47,120 @@ def save_json(path, data):
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
-def match_keywords(text, keywords, neg_keywords=None):
-    """关键词命中（大小写不敏感），且排除否定词。
-
-    正向命中：标题含任一福利关键词；
-    否定排除：标题含任一否定词（辟谣/翻车/停运等）则视为无效情报，
-    避免把"某平台免费额度被砍"这类负面消息当福利推送。
-    """
-    if not text:
-        return False
-    low = text.lower()
-    if not any(str(k).lower() in low for k in keywords):
-        return False
-    if neg_keywords and any(str(k).lower() in low for k in neg_keywords):
-        return False
-    return True
-
-
-# ---------- 数据源 1：Discourse 论坛（linux.do） ----------
-
-def fetch_discourse(base, keywords, neg_keywords=None):
-    """抓 Discourse 站点最新帖，按标题关键词过滤"""
-    url = base.rstrip("/") + "/latest.json"
+def _to_num(x):
+    """把价格字段（可能是 float 或 str）安全转为 float，失败返回 None"""
+    if x is None:
+        return None
     try:
-        r = requests.get(
-            url,
-            headers={"User-Agent": UA, "Accept": "application/json"},
-            timeout=HTTP_TIMEOUT,
-        )
-        r.raise_for_status()
-        topics = r.json().get("topic_list", {}).get("topics", []) or []
-        items = []
-        for t in topics:
-            title = t.get("title", "")
-            if not title or not match_keywords(title, keywords, neg_keywords):
-                continue
-            tid = t.get("id")
-            slug = t.get("slug") or "topic"
-            items.append({
-                "id": f"discourse:{base}:{tid}",
-                "source": base.split("//")[-1].split("/")[0],
-                "title": title,
-                "url": f"{base.rstrip('/')}/t/{slug}/{tid}",
-                "time": t.get("created_at", ""),
-            })
-        print(f"[ok] {base} 最新帖 {len(topics)} 条，命中 {len(items)} 条")
-        return items
-    except Exception as e:
-        print(f"[warn] {base} 抓取失败（跳过）: {type(e).__name__}: {e}")
-        return []
-
-
-# ---------- 数据源 2：GitHub 仓库更新 ----------
-
-def extract_added_resources(patch):
-    """从 resources.json 的 diff patch 中提取「新增资源」条目。
-
-    只在新增行（+ 开头）里识别 `"name"` 字段，避免把巡检导致的
-    status / free_tier 等字段变化误判为新增资源。
-    返回：[{"name", "url", "description", "free_tier"}, ...]
-    """
-    if not patch:
-        return []
-    added = []
-    cur = None
-    for raw in patch.split("\n"):
-        if raw.startswith("+++") or raw.startswith("---"):
-            continue
-        if not raw.startswith("+"):
-            # 遇到非新增行，收尾上一个未闭合对象
-            if cur and cur.get("name"):
-                added.append(cur)
-            cur = None
-            continue
-        line = raw[1:].strip()
-        m = re.search(r'"name"\s*:\s*"([^"]+)"', line)
-        if m:
-            if cur and cur.get("name"):
-                added.append(cur)  # 上一个新增对象收尾
-            cur = {"name": m.group(1)}
-            continue
-        if cur is not None:
-            m = re.search(r'"url"\s*:\s*"([^"]+)"', line)
-            if m and "url" not in cur:
-                cur["url"] = m.group(1)
-            m = re.search(r'"free_tier"\s*:\s*"([^"]+)"', line)
-            if m and "free_tier" not in cur:
-                cur["free_tier"] = m.group(1)
-            m = re.search(r'"description"\s*:\s*"([^"]+)"', line)
-            if m and "description" not in cur:
-                cur["description"] = m.group(1)
-    if cur and cur.get("name"):
-        added.append(cur)
-    return added
-
-
-def _get_commit_detail(repo, sha, headers):
-    """拉取单个 commit 的文件级 diff"""
-    api = f"https://api.github.com/repos/{repo}/commits/{sha}"
-    try:
-        r = requests.get(api, headers=headers, timeout=HTTP_TIMEOUT)
-        r.raise_for_status()
-        return r.json()
-    except Exception as e:
-        print(f"[warn] 获取 commit {sha[:8]} 详情失败: {type(e).__name__}: {e}")
+        return float(x)
+    except (TypeError, ValueError):
         return None
 
 
-def _extract_added_from_commit(detail):
-    """从 commit 详情的 files 数组中，汇总 resources.json 里新增的资源"""
-    files = detail.get("files", []) or []
-    added = []
-    for f in files:
-        fn = f.get("filename", "")
-        if fn.endswith("resources.json"):
-            added += extract_added_resources(f.get("patch", ""))
-    return added
+def _fmt(usd_per_mtok):
+    """格式化：美元/百万token，保留 4 位小数"""
+    if usd_per_mtok is None:
+        return "?"
+    return f"${usd_per_mtok:.4f}"
 
 
-def fetch_github_commits(repo, token=None):
-    """监控 GitHub 仓库的「新增免费资源」，而非所有 commit。
+def _fmt_cny(usd_per_mtok, rate):
+    """格式化：人民币/百万token（按固定汇率估算）"""
+    if usd_per_mtok is None or not rate:
+        return "?"
+    return f"¥{usd_per_mtok * rate:.3f}"
 
-    逐个拉取最新 commit 的文件级 diff，只在 data/resources.json 出现
-    新增资源条目（新增 `"name"` 字段）时才生成情报，并附带免费额度摘要。
-    例行巡检类 commit（只改 status.json / 无新增资源）会被跳过。
+
+# ---------- 数据获取 ----------
+
+def fetch_openrouter_prices():
+    """拉取 OpenRouter 全量模型价格。
+
+    返回 dict: { model_id: {"name": ..., "prompt": float, "completion": float} }
+    prompt/completion 单位已换算为「美元/百万token」。
     """
-    api = f"https://api.github.com/repos/{repo}/commits?per_page=5"
-    headers = {"Accept": "application/vnd.github+json", "User-Agent": "gpu-deal-monitor"}
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
     try:
-        r = requests.get(api, headers=headers, timeout=HTTP_TIMEOUT)
+        r = requests.get(OPENROUTER_API, headers={"User-Agent": UA}, timeout=HTTP_TIMEOUT)
         r.raise_for_status()
-        commits = r.json()
-        items = []
-        for c in commits:
-            sha = c.get("sha", "")
-            if not sha:
-                continue
-            detail = _get_commit_detail(repo, sha, headers)
-            if detail is None:
-                continue
-            added = _extract_added_from_commit(detail)
-            if not added:
-                # 无新增资源（纯巡检/维护），跳过，不推送
-                continue
-            names = [a.get("name", "?") for a in added]
-            title = f"新增免费资源: {'、'.join(names[:5])}"
-            if len(names) > 5:
-                title += f" 等 {len(names)} 个"
-            items.append({
-                "id": f"github:{repo}:{sha[:12]}",
-                "source": f"GitHub·{repo.split('/')[-1]}",
-                "title": title,
-                "url": c.get("html_url", ""),
-                "time": c.get("commit", {}).get("author", {}).get("date", ""),
-                "added": added,  # 附带详情，供推送摘要展开
-            })
-        print(f"[ok] {repo} 最近 {len(commits)} 个 commit，含新增资源 {len(items)} 个")
-        return items
+        data = r.json().get("data", []) or []
     except Exception as e:
-        print(f"[warn] {repo} 抓取失败（跳过）: {type(e).__name__}: {e}")
-        return []
+        print(f"[warn] 拉取 OpenRouter 失败（跳过）: {type(e).__name__}: {e}")
+        return None
+
+    models = {}
+    for m in data:
+        mid = m.get("id", "")
+        if not mid:
+            continue
+        pricing = m.get("pricing", {}) or {}
+        prompt = _to_num(pricing.get("prompt"))
+        completion = _to_num(pricing.get("completion"))
+        # 换算成 美元/百万token（原值是 美元/token）
+        models[mid] = {
+            "name": m.get("name", mid),
+            "prompt": prompt * 1e6 if prompt is not None else None,
+            "completion": completion * 1e6 if completion is not None else None,
+        }
+    print(f"[ok] OpenRouter 拉取成功，共 {len(models)} 个模型")
+    return models
 
 
-# ---------- 数据源 3：RSS / Atom 订阅 ----------
+# ---------- 对比 ----------
 
-def fetch_rss(url, keywords, neg_keywords=None):
-    """抓 RSS/Atom 源，按标题关键词过滤"""
-    if feedparser is None:
-        print("[warn] feedparser 未安装，跳过 RSS 源")
-        return []
-    try:
-        d = feedparser.parse(url, request_headers={"User-Agent": UA})
-        entries = getattr(d, "entries", [])[:40]
-        items = []
-        for e in entries:
-            title = e.get("title", "")
-            if not title or not match_keywords(title, keywords, neg_keywords):
-                continue
-            link = e.get("link", "")
-            # 生成稳定 id：优先用 guid/id，否则用链接哈希
-            eid = e.get("id") or e.get("guid") or link or title
-            items.append({
-                "id": f"rss:{eid}",
-                "source": url.split("//")[-1].split("/")[0],
-                "title": title,
-                "url": link,
-                "time": e.get("published", "") or e.get("updated", ""),
+def compare_prices(track_models, current, previous):
+    """对比当前价格与快照，返回变动列表。
+
+    返回 list of dict，每项：
+      { "kind": "change"|"new"|"removed", "label", "id",
+        "prompt_old", "prompt_new", "completion_old", "completion_new" }
+    其中 old/new 单位均为 美元/百万token。
+    """
+    changes = []
+    for mid, label in track_models.items():
+        cur = current.get(mid)
+        prev = previous.get(mid)
+
+        if cur is None:
+            # 当前接口里已无此模型
+            if prev is not None:
+                changes.append({
+                    "kind": "removed", "label": label, "id": mid,
+                    "prompt_old": prev.get("prompt"), "completion_old": prev.get("completion"),
+                    "prompt_new": None, "completion_new": None,
+                })
+            continue
+
+        if prev is None:
+            # 快照里没有，属于新上线的模型
+            changes.append({
+                "kind": "new", "label": label, "id": mid,
+                "prompt_old": None, "completion_old": None,
+                "prompt_new": cur.get("prompt"), "completion_new": cur.get("completion"),
             })
-        print(f"[ok] RSS {url} 共 {len(entries)} 条，命中 {len(items)} 条")
-        return items
-    except Exception as e:
-        print(f"[warn] RSS {url} 抓取失败（跳过）: {type(e).__name__}: {e}")
-        return []
+            continue
+
+        # 价格变动检测（容忍极小浮点误差）
+        p_changed = _differs(prev.get("prompt"), cur.get("prompt"))
+        c_changed = _differs(prev.get("completion"), cur.get("completion"))
+        if p_changed or c_changed:
+            changes.append({
+                "kind": "change", "label": label, "id": mid,
+                "prompt_old": prev.get("prompt"), "completion_old": prev.get("completion"),
+                "prompt_new": cur.get("prompt"), "completion_new": cur.get("completion"),
+            })
+    return changes
 
 
-# ---------- 推送（Server酱 → 微信） ----------
+def _differs(a, b):
+    """判断两个价格是否不同（容忍浮点误差，None 视为不同）"""
+    if a is None and b is None:
+        return False
+    if a is None or b is None:
+        return True
+    return abs(a - b) > 1e-9
+
+
+# ---------- 推送 ----------
 
 def push_serverchan(sendkey, title, desp):
     if not sendkey:
@@ -268,87 +179,110 @@ def push_serverchan(sendkey, title, desp):
     return False
 
 
+def _pct(old, new):
+    """计算涨跌幅百分比，返回字符串如 "+12.3%" / "-5.0%"；old<=0 时返回 None"""
+    if old is None or new is None or old <= 0:
+        return None
+    return (new - old) / old * 100.0
+
+
+def _build_desp(changes, rate):
+    """根据变动列表构建推送正文（Markdown）"""
+    lines = [f"### 📊 检测到 {len(changes)} 项 Token 价格变动\n"]
+    for i, ch in enumerate(changes[:MAX_PUSH_ITEMS], 1):
+        label = ch["label"]
+        if ch["kind"] == "removed":
+            lines.append(f"**{i}. {label}**  🚫 已下架")
+            if ch["prompt_old"] is not None:
+                lines.append(f"- 原输入 {_fmt(ch['prompt_old'])} / 输出 {_fmt(ch['completion_old'])}")
+        elif ch["kind"] == "new":
+            lines.append(f"**{i}. {label}**  🆕 新上线")
+            lines.append(
+                f"- 输入 {_fmt(ch['prompt_new'])} / 输出 {_fmt(ch['completion_new'])}"
+            )
+        else:
+            p_pct = _pct(ch["prompt_old"], ch["prompt_new"])
+            c_pct = _pct(ch["completion_old"], ch["completion_new"])
+            arrow_p = _arrow(p_pct)
+            arrow_c = _arrow(c_pct)
+            lines.append(f"**{i}. {label}**")
+            if p_pct is not None:
+                lines.append(
+                    f"- 输入: {_fmt(ch['prompt_old'])} → {_fmt(ch['prompt_new'])} {arrow_p}{p_pct:+.1f}%"
+                )
+            if c_pct is not None:
+                lines.append(
+                    f"- 输出: {_fmt(ch['completion_old'])} → {_fmt(ch['completion_new'])} {arrow_c}{c_pct:+.1f}%"
+                )
+        lines.append("")
+    if len(changes) > MAX_PUSH_ITEMS:
+        lines.append(f"> 还有 {len(changes) - MAX_PUSH_ITEMS} 项未展开")
+    lines.append("\n> 单位：美元/百万token；人民币按 1 USD ≈ " + f"{rate} CNY 估算")
+    lines.append("> 数据源: OpenRouter")
+    return "\n".join(lines)
+
+
+def _arrow(pct):
+    """涨价用红色▲，降价用绿色▼（国内习惯：涨红跌绿）"""
+    if pct is None:
+        return ""
+    return "🔴 " if pct > 0 else "🟢 "
+
+
 # ---------- 主流程 ----------
 
 def main():
     config = load_json(CONFIG_FILE, {})
-    keywords = config.get("keywords", [])
-    neg_keywords = config.get("negative_keywords", [])
-    state = load_json(STATE_FILE, {"seen": {}, "first_run": True})
-    seen = state.get("seen", {})
+    track_models = config.get("track_models", {})
+    rate = config.get("usd_to_cny", 7.2)
+
+    if not track_models:
+        print("[warn] config.json 未配置 track_models，退出")
+        return
+
+    state = load_json(STATE_FILE, {"first_run": True, "prices": {}})
+    previous = state.get("prices", {}) or {}
 
     sendkey = os.environ.get("SERVERCHAN_SENDKEY", "").strip()
-    gh_token = os.environ.get("GITHUB_TOKEN", "").strip() or None
 
-    all_items = []
-    for site in config.get("linuxdo_sites", []):
-        all_items += fetch_discourse(site, keywords, neg_keywords)
-    for repo in config.get("github_repos", []):
-        all_items += fetch_github_commits(repo, gh_token)
-    for feed in config.get("rss_feeds", []):
-        all_items += fetch_rss(feed, keywords, neg_keywords)
+    current = fetch_openrouter_prices()
+    if current is None:
+        print("[warn] 本次拉取失败，不更新快照、不推送")
+        return
 
-    # 跨源去重：同一 URL 只保留一条（同一情报可能被多个源同时覆盖）
-    dedup = {}
-    for it in all_items:
-        key = it.get("url") or it["id"]
-        if key:
-            dedup.setdefault(key, it)
-    all_items = list(dedup.values())
+    changes = compare_prices(track_models, current, previous)
+    print(f"\n关注模型 {len(track_models)} 个，检测到 {len(changes)} 项变动")
 
-    print(f"\n共采集 {len(all_items)} 条候选情报")
-
-    # 去重：只保留未见过的
-    fresh = [it for it in all_items if it["id"] not in seen]
-    print(f"其中新增 {len(fresh)} 条")
-
-    # 标记全部为已见
+    # 更新快照：把关注模型的最新价格写回
+    new_prices = {}
+    for mid, label in track_models.items():
+        cur = current.get(mid)
+        if cur is not None:
+            new_prices[mid] = {
+                "prompt": cur.get("prompt"),
+                "completion": cur.get("completion"),
+            }
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
-    for it in all_items:
-        seen[it["id"]] = {"first_seen": now, "title": it["title"]}
-
-    # 状态裁剪，防止无限增长
-    if len(seen) > STATE_KEEP:
-        keep = dict(list(seen.items())[-STATE_KEEP:])
-        seen = keep
-
-    state["seen"] = seen
+    state["prices"] = new_prices
     state["last_run"] = now
-    state["last_new_count"] = len(fresh)
 
     if state.get("first_run", True):
         state["first_run"] = False
         save_json(STATE_FILE, state)
-        print("[info] 首次运行：建立基线，不推送。下次运行起新增情报才会推送。")
+        print("[info] 首次运行：建立价格基线，不推送。下次起价格变动才会推送。")
+        print("      当前基线价格：")
+        for mid, p in new_prices.items():
+            print(f"        {track_models.get(mid, mid)}: 输入 {_fmt(p['prompt'])} / 输出 {_fmt(p['completion'])}")
         return
 
     save_json(STATE_FILE, state)
 
-    if not fresh:
-        print("[info] 本次无新增情报，不推送")
+    if not changes:
+        print("[info] 本次无价格变动，不推送")
         return
 
-    # 组装推送内容
-    show = fresh[:MAX_PUSH_ITEMS]
-    lines = [f"### 🔍 发现 {len(fresh)} 条算力福利\n"]
-    for i, it in enumerate(show, 1):
-        lines.append(f"**{i}. {it['title']}**")
-        # GitHub 源附带新增资源详情，直接展开免费额度，一眼可判是否福利
-        for a in it.get("added", [])[:5]:
-            name = a.get("name", "?").strip()
-            ft = a.get("free_tier", "").strip()
-            url = a.get("url", "").strip()
-            if ft:
-                lines.append(f"- {name}：{ft}")
-            elif url:
-                lines.append(f"- {name}：{url}")
-            else:
-                lines.append(f"- {name}")
-        lines.append(f"来源: {it['source']} → [点此查看]({it['url']})\n")
-    if len(fresh) > MAX_PUSH_ITEMS:
-        lines.append(f"> 还有 {len(fresh) - MAX_PUSH_ITEMS} 条未展开")
-    desp = "\n".join(lines)
-    title = f"⚡算力福利: 新增 {len(fresh)} 条（{now}）"
+    desp = _build_desp(changes, rate)
+    title = f"📊 Token价格监测: {len(changes)} 项变动（{now}）"
 
     print("\n----- 推送预览 -----")
     print(desp)
