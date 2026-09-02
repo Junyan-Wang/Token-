@@ -1,6 +1,19 @@
 {
-  "seen": {},
-  "first_run": true,
-  "last_run": "",
-  "last_new_count": 0
+  "seen": {
+    "github:caozuohua/free-resources:14d26a172c4b": {
+      "first_seen": "2026-09-02 01:26",
+      "title": "仓库有更新: chore: update resource status [2026-08-31]"
+    },
+    "github:caozuohua/free-resources:860b91cb495a": {
+      "first_seen": "2026-09-02 01:26",
+      "title": "仓库有更新: chore: update resource status [2026-08-24]"
+    },
+    "github:caozuohua/free-resources:9352407b310b": {
+      "first_seen": "2026-09-02 01:26",
+      "title": "仓库有更新: chore: update resource status [2026-08-17]"
+    }
+  },
+  "first_run": false,
+  "last_run": "2026-09-02 01:26",
+  "last_new_count": 3
 }
