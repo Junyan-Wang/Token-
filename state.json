@@ -2,8 +2,8 @@
   "first_run": false,
   "prices": {
     "deepseek/deepseek-v4-pro-0813": {
-      "prompt": 0.66,
-      "completion": 1.9800000000000002
+      "prompt": 1.1154,
+      "completion": 3.3461999999999996
     },
     "deepseek/deepseek-v4-flash-0731": {
       "prompt": 0.065,
@@ -74,7 +74,7 @@
       "completion": 12.5
     }
   },
-  "last_run": "2026-09-04 00:37",
+  "last_run": "2026-09-04 04:30",
   "model_count": 18,
   "cny_rate": 7.2
 }
