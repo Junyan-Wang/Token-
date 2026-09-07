@@ -6,8 +6,8 @@
       "completion": 3.36204
     },
     "deepseek/deepseek-v4-flash-0731": {
-      "prompt": 0.049980000000000004,
-      "completion": 0.09996000000000001
+      "prompt": 0.14,
+      "completion": 0.28
     },
     "moonshotai/kimi-k3": {
       "prompt": 3.0,
@@ -70,7 +70,7 @@
       "completion": 12.5
     }
   },
-  "last_run": "2026-09-06 12:34",
+  "last_run": "2026-09-07 00:42",
   "model_count": 17,
   "cny_rate": 7.2
 }
