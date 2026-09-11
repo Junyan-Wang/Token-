@@ -10,8 +10,8 @@
       "completion": 0.18
     },
     "moonshotai/kimi-k3": {
-      "prompt": 3.0,
-      "completion": 15.0
+      "prompt": 2.6,
+      "completion": 13.0
     },
     "z-ai/glm-5.3": {
       "prompt": 1.4,
@@ -70,7 +70,7 @@
       "completion": 12.5
     }
   },
-  "last_run": "2026-09-10 12:38",
+  "last_run": "2026-09-11 00:38",
   "model_count": 17,
   "cny_rate": 7.2
 }
