@@ -2,20 +2,20 @@
   "first_run": false,
   "prices": {
     "deepseek/deepseek-v4-pro-0813": {
-      "prompt": 0.57948,
-      "completion": 1.73844
+      "prompt": 0.57816,
+      "completion": 1.73448
     },
     "deepseek/deepseek-v4-flash-0731": {
       "prompt": 0.04,
       "completion": 0.08
     },
     "moonshotai/kimi-k3": {
-      "prompt": 2.30272875,
-      "completion": 11.550195
+      "prompt": 2.6481380629999998,
+      "completion": 13.282724250000001
     },
     "z-ai/glm-5.3": {
-      "prompt": 1.4,
-      "completion": 4.4
+      "prompt": 1.092,
+      "completion": 3.432
     },
     "tencent/hy4-preview": {
       "prompt": 0.834,
@@ -70,7 +70,7 @@
       "completion": 12.5
     }
   },
-  "last_run": "2026-09-12 15:36",
+  "last_run": "2026-09-13 04:56",
   "model_count": 17,
   "cny_rate": 7.2
 }
