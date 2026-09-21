@@ -7,15 +7,15 @@
     },
     "deepseek/deepseek-v4-flash-0731": {
       "prompt": 0.04,
-      "completion": 0.08
+      "completion": 0.16
     },
     "moonshotai/kimi-k3": {
       "prompt": 1.7,
       "completion": 8.5
     },
     "z-ai/glm-5.3": {
-      "prompt": 0.896,
-      "completion": 2.816
+      "prompt": 0.9099999999999999,
+      "completion": 2.8600000000000003
     },
     "tencent/hy4-preview": {
       "prompt": 0.834,
@@ -62,15 +62,15 @@
       "completion": 6.0
     },
     "meta-llama/llama-4-maverick": {
-      "prompt": 0.1875,
-      "completion": 0.6525
+      "prompt": 0.19999999999999998,
+      "completion": 0.7999999999999999
     },
     "amazon/nova-premier-v1": {
       "prompt": 2.5,
       "completion": 12.5
     }
   },
-  "last_run": "2026-09-20 13:05",
+  "last_run": "2026-09-21 05:06",
   "model_count": 17,
   "cny_rate": 7.2
 }
