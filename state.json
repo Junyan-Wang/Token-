@@ -14,8 +14,8 @@
       "completion": 15.0
     },
     "z-ai/glm-5.3": {
-      "prompt": 1.4,
-      "completion": 4.4
+      "prompt": 0.3794,
+      "completion": 1.1924
     },
     "tencent/hy4-preview": {
       "prompt": 0.834,
@@ -70,7 +70,7 @@
       "completion": 12.5
     }
   },
-  "last_run": "2026-09-26 05:08",
+  "last_run": "2026-09-26 13:12",
   "model_count": 17,
   "cny_rate": 7.2
 }
