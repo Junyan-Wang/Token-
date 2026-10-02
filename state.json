@@ -6,16 +6,16 @@
       "completion": 1.9800000000000002
     },
     "deepseek/deepseek-v4-flash-0731": {
-      "prompt": 0.0108,
+      "prompt": 0.0171,
       "completion": 1.28
     },
     "moonshotai/kimi-k3": {
-      "prompt": 0.6572,
-      "completion": 10.0
+      "prompt": 2.7,
+      "completion": 13.5
     },
     "z-ai/glm-5.3": {
-      "prompt": 0.2219,
-      "completion": 3.39
+      "prompt": 1.4,
+      "completion": 4.4
     },
     "tencent/hy4-preview": {
       "prompt": 0.834,
@@ -70,7 +70,7 @@
       "completion": 12.5
     }
   },
-  "last_run": "2026-10-01 15:30",
+  "last_run": "2026-10-02 05:49",
   "model_count": 17,
   "cny_rate": 7.2
 }
