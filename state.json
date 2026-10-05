@@ -2,7 +2,7 @@
   "first_run": false,
   "prices": {
     "deepseek/deepseek-v4-pro-0813": {
-      "prompt": 0.55,
+      "prompt": 0.39999999999999997,
       "completion": 5.0
     },
     "deepseek/deepseek-v4-flash-0731": {
@@ -14,12 +14,12 @@
       "completion": 14.0
     },
     "z-ai/glm-5.3": {
-      "prompt": 1.4,
-      "completion": 4.4
+      "prompt": 0.049999999999999996,
+      "completion": 7.0
     },
     "tencent/hy4-preview": {
-      "prompt": 0.834,
-      "completion": 2.501
+      "prompt": 0.7505999999999999,
+      "completion": 2.2509
     },
     "bytedance-seed/seed-2-1-turbo": {
       "prompt": 0.5,
@@ -70,7 +70,7 @@
       "completion": 12.5
     }
   },
-  "last_run": "2026-10-05 05:51",
+  "last_run": "2026-10-05 17:12",
   "model_count": 17,
   "cny_rate": 7.2
 }
