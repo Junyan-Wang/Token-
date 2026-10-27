@@ -6,11 +6,11 @@
       "completion": 1.9800000000000002
     },
     "deepseek/deepseek-v4-flash-0731": {
-      "prompt": 0.04444,
-      "completion": 0.13332
+      "prompt": 0.119,
+      "completion": 0.238
     },
     "moonshotai/kimi-k3": {
-      "prompt": 0.161,
+      "prompt": 0.19999999999999998,
       "completion": 20.0
     },
     "z-ai/glm-5.3": {
@@ -34,8 +34,8 @@
       "completion": 1.2
     },
     "xiaomi/mimo-v2.5-pro": {
-      "prompt": 0.3045,
-      "completion": 0.609
+      "prompt": 0.48,
+      "completion": 1.7999999999999998
     },
     "stepfun/step-3.7-flash": {
       "prompt": 0.19999999999999998,
@@ -66,7 +66,7 @@
       "completion": 12.5
     }
   },
-  "last_run": "2026-10-26 15:16",
+  "last_run": "2026-10-27 05:15",
   "model_count": 16,
   "cny_rate": 7.2
 }
