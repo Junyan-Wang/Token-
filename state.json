@@ -10,12 +10,12 @@
       "completion": 0.238
     },
     "moonshotai/kimi-k3": {
-      "prompt": 0.23900000000000002,
-      "completion": 10.8
+      "prompt": 0.19999999999999998,
+      "completion": 15.0
     },
     "z-ai/glm-5.3": {
-      "prompt": 0.0699,
-      "completion": 1.4
+      "prompt": 0.08,
+      "completion": 3.5999999999999996
     },
     "tencent/hy4-preview": {
       "prompt": 0.834,
@@ -66,7 +66,7 @@
       "completion": 12.5
     }
   },
-  "last_run": "2026-10-29 15:17",
+  "last_run": "2026-10-30 05:59",
   "model_count": 16,
   "cny_rate": 7.2
 }
