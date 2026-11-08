@@ -2,11 +2,11 @@
   "first_run": false,
   "prices": {
     "deepseek/deepseek-v4-pro-0813": {
-      "prompt": 0.1165,
-      "completion": 4.66
+      "prompt": 0.111,
+      "completion": 4.4399999999999995
     },
     "deepseek/deepseek-v4-flash-0731": {
-      "prompt": 0.059,
+      "prompt": 0.0434,
       "completion": 0.3
     },
     "moonshotai/kimi-k3": {
@@ -66,7 +66,7 @@
       "completion": 12.5
     }
   },
-  "last_run": "2026-11-07 14:56",
+  "last_run": "2026-11-08 06:16",
   "model_count": 16,
   "cny_rate": 7.2
 }
